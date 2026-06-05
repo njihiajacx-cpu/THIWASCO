@@ -16,10 +16,14 @@ import os
 # Main Application
 # ============================================
 
+VERCEL_ENV = os.getenv("VERCEL") or os.getenv("VERCEL_ENV")
+APP_ROOT_PATH = "/api" if VERCEL_ENV else ""
+
 app = FastAPI(
     title="THIWASCO SmartWater Platform",
     description="Water Management Ecosystem for Thika, Kenya",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=APP_ROOT_PATH,
 )
 
 # CORS
@@ -39,7 +43,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/login" if APP_ROOT_PATH else "/auth/login")
 
 # ============================================
 # DATA MODELS
