@@ -1,1 +1,0 @@
-{api-gateway,user-service,incident-service,iot-service}

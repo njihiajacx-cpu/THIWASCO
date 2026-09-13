@@ -16,14 +16,10 @@ import os
 # Main Application
 # ============================================
 
-VERCEL_ENV = os.getenv("VERCEL") or os.getenv("VERCEL_ENV")
-APP_ROOT_PATH = "/api" if VERCEL_ENV else ""
-
 app = FastAPI(
     title="THIWASCO SmartWater Platform",
     description="Water Management Ecosystem for Thika, Kenya",
     version="1.0.0",
-    root_path=APP_ROOT_PATH,
 )
 
 # CORS
@@ -43,8 +39,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/auth/login" if APP_ROOT_PATH else "/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # ============================================
 # DATA MODELS
@@ -939,6 +934,20 @@ async def redeem_points(
         "bill_credit_kes": bill_credit,
         "remaining_points": current_user["reward_points"]
     }
+
+# ============================================
+# MOUNT UNDER /api
+# ============================================
+# The dashboard and Vercel's rewrite both call paths like /api/auth/login,
+# so the routes above (defined without the /api prefix) are mounted at
+# /api here. This works the same locally and on Vercel.
+_routes_app = app
+app = FastAPI(
+    title="THIWASCO SmartWater Platform",
+    description="Water Management Ecosystem for Thika, Kenya",
+    version="1.0.0",
+)
+app.mount("/api", _routes_app)
 
 # ============================================
 # MAIN APPLICATION ENTRY POINT

@@ -13,7 +13,7 @@ fi
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-pip3 install -r backend/Requirement.txt
+pip3 install -r requirements.txt
 
 # Start backend server
 echo "🚀 Starting backend server..."

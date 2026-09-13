@@ -12,7 +12,7 @@ client = TestClient(app)
 
 
 def test_health_endpoint():
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "healthy"
@@ -21,7 +21,7 @@ def test_health_endpoint():
 
 def test_login_endpoint_success():
     response = client.post(
-        "/auth/login",
+        "/api/auth/login",
         data={"username": "john@example.com", "password": "password123"},
         headers={"content-type": "application/x-www-form-urlencoded"},
     )
