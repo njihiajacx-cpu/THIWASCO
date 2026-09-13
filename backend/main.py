@@ -1,15 +1,19 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from pathlib import Path
 import uvicorn
 import uuid
 import json
 import os
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ============================================
 # THIWASCO SMARTWATER PLATFORM
@@ -952,19 +956,23 @@ async def redeem_points(
 app.include_router(router, prefix="/api")
 
 
-# TEMPORARY: diagnostic route to see exactly what Vercel delivers to the
-# app for any request that doesn't match a real route. Remove once the
-# /api routing issue in production is confirmed fixed.
-@app.get("/{full_path:path}")
-async def debug_catchall(full_path: str, request: Request):
-    return {
-        "full_path_param": full_path,
-        "request_url_path": request.url.path,
-        "scope_path": request.scope.get("path"),
-        "scope_root_path": request.scope.get("root_path"),
-        "raw_path": request.scope.get("raw_path", b"").decode("utf-8", "replace"),
-        "query_string": request.scope.get("query_string", b"").decode("utf-8", "replace"),
-    }
+# ============================================
+# STATIC ASSETS (dashboard + background image)
+# ============================================
+# Vercel's zero-config static file serving isn't reliable across every
+# project configuration (it wasn't active at all in testing - every
+# path, matched or not, was being routed into this function). FastAPI
+# serves these directly instead so it doesn't depend on that.
+
+
+@app.get("/", include_in_schema=False)
+async def serve_dashboard():
+    return FileResponse(BASE_DIR / "backend" / "web" / "dashboard" / "index.html")
+
+
+@app.get("/ocean_background.jpg", include_in_schema=False)
+async def serve_ocean_background():
+    return FileResponse(BASE_DIR / "ocean_background.jpg")
 
 # ============================================
 # MAIN APPLICATION ENTRY POINT
