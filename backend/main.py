@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -950,6 +950,21 @@ async def redeem_points(
 # so the router (defined without the /api prefix) is included here with
 # that prefix. This works the same locally and on Vercel.
 app.include_router(router, prefix="/api")
+
+
+# TEMPORARY: diagnostic route to see exactly what Vercel delivers to the
+# app for any request that doesn't match a real route. Remove once the
+# /api routing issue in production is confirmed fixed.
+@app.get("/{full_path:path}")
+async def debug_catchall(full_path: str, request: Request):
+    return {
+        "full_path_param": full_path,
+        "request_url_path": request.url.path,
+        "scope_path": request.scope.get("path"),
+        "scope_root_path": request.scope.get("root_path"),
+        "raw_path": request.scope.get("raw_path", b"").decode("utf-8", "replace"),
+        "query_string": request.scope.get("query_string", b"").decode("utf-8", "replace"),
+    }
 
 # ============================================
 # MAIN APPLICATION ENTRY POINT
