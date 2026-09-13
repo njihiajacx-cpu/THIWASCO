@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -30,6 +30,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# All routes below are registered on this router, then included on `app`
+# under the /api prefix at the bottom of the file. A plain Mount() was
+# tried first but Vercel's Python ASGI adapter didn't dispatch into the
+# sub-app correctly (every mounted route 404'd in production despite
+# working locally); include_router keeps everything on one app instance
+# and just avoids that adapter quirk.
+router = APIRouter()
 
 # ============================================
 # SECURITY CONFIGURATION
@@ -277,7 +285,7 @@ def role_checker(allowed_roles: List[str]):
 # ============================================
 
 
-@app.get("/")
+@router.get("/")
 async def root():
     return {
         "platform": "THIWASCO SmartWater Platform",
@@ -295,7 +303,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@router.get("/health")
 async def health_check():
     return {
         "status": "healthy",
@@ -309,7 +317,7 @@ async def health_check():
 # ============================================
 
 
-@app.post("/auth/login", response_model=Token)
+@router.post("/auth/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     # Find user by email
     user = None
@@ -346,7 +354,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     }
 
 
-@app.post("/auth/register")
+@router.post("/auth/register")
 async def register(user_data: UserCreate):
     # Check if user exists
     for u in db.users.values():
@@ -383,7 +391,7 @@ async def register(user_data: UserCreate):
     }
 
 
-@app.get("/users/me")
+@router.get("/users/me")
 async def get_profile(current_user: dict = Depends(get_current_user)):
     return current_user
 
@@ -392,7 +400,7 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
 # ============================================
 
 
-@app.get("/water/status/{zone_id}")
+@router.get("/water/status/{zone_id}")
 async def get_water_status(zone_id: str):
     """Get current water status for a zone"""
     if zone_id not in db.sensor_data:
@@ -409,7 +417,7 @@ async def get_water_status(zone_id: str):
     }
 
 
-@app.get("/water/schedule/{zone_id}")
+@router.get("/water/schedule/{zone_id}")
 async def get_water_schedule(zone_id: str):
     """Get water supply schedule for a zone"""
     schedules = {
@@ -444,7 +452,7 @@ async def get_water_schedule(zone_id: str):
     }
 
 
-@app.get("/water/zones")
+@router.get("/water/zones")
 async def list_zones():
     """List all water supply zones"""
     zones = [
@@ -460,7 +468,7 @@ async def list_zones():
 # ============================================
 
 
-@app.post("/incidents/report")
+@router.post("/incidents/report")
 async def report_incident(
     incident: IncidentCreate,
     current_user: dict = Depends(get_current_user)
@@ -512,7 +520,7 @@ async def report_incident(
     }
 
 
-@app.get("/incidents/nearby")
+@router.get("/incidents/nearby")
 async def get_nearby_incidents(
     latitude: float,
     longitude: float,
@@ -537,7 +545,7 @@ async def get_nearby_incidents(
     return sorted(nearby, key=lambda x: x["distance_km"])
 
 
-@app.get("/incidents/my-reports")
+@router.get("/incidents/my-reports")
 async def get_my_reports(current_user: dict = Depends(get_current_user)):
     """Get incidents reported by current user"""
     my_reports = []
@@ -550,7 +558,7 @@ async def get_my_reports(current_user: dict = Depends(get_current_user)):
     return sorted(my_reports, key=lambda x: x["created_at"], reverse=True)
 
 
-@app.get("/incidents/all")
+@router.get("/incidents/all")
 async def get_all_incidents(
     current_user: dict = Depends(
         role_checker(["Manager", "Executive", "Admin"]))
@@ -565,7 +573,7 @@ async def get_all_incidents(
     return {"total": len(all_incidents), "incidents": all_incidents}
 
 
-@app.put("/incidents/{incident_id}/status")
+@router.put("/incidents/{incident_id}/status")
 async def update_incident_status(
     incident_id: str,
     status_update: dict,
@@ -589,7 +597,7 @@ async def update_incident_status(
 # ============================================
 
 
-@app.get("/billing/current")
+@router.get("/billing/current")
 async def get_current_bill(current_user: dict = Depends(get_current_user)):
     """Get current bill for user"""
     for bill in db.bills.values():
@@ -608,7 +616,7 @@ async def get_current_bill(current_user: dict = Depends(get_current_user)):
     }
 
 
-@app.get("/billing/history")
+@router.get("/billing/history")
 async def get_billing_history(current_user: dict = Depends(get_current_user)):
     """Get billing history"""
     history = []
@@ -624,7 +632,7 @@ async def get_billing_history(current_user: dict = Depends(get_current_user)):
     return {"bills": history}
 
 
-@app.post("/billing/pay")
+@router.post("/billing/pay")
 async def pay_bill(
     payment: dict,
     current_user: dict = Depends(get_current_user)
@@ -663,7 +671,7 @@ async def pay_bill(
 # ============================================
 
 
-@app.get("/gis/assets")
+@router.get("/gis/assets")
 async def get_water_assets():
     """Get water infrastructure assets for map display"""
     return {
@@ -717,7 +725,7 @@ async def get_water_assets():
     }
 
 
-@app.get("/gis/pipelines")
+@router.get("/gis/pipelines")
 async def get_pipelines():
     """Get pipeline network data"""
     pipelines = [
@@ -744,7 +752,7 @@ async def get_pipelines():
 # ============================================
 
 
-@app.get("/workorders/assigned")
+@router.get("/workorders/assigned")
 async def get_assigned_orders(current_user: dict = Depends(get_current_user)):
     """Get work orders assigned to technician"""
     if current_user["role"] != "Technician":
@@ -772,7 +780,7 @@ async def get_assigned_orders(current_user: dict = Depends(get_current_user)):
     return {"work_orders": work_orders}
 
 
-@app.put("/workorders/{order_id}/complete")
+@router.put("/workorders/{order_id}/complete")
 async def complete_workorder(
     order_id: str,
     completion: dict,
@@ -795,7 +803,7 @@ async def complete_workorder(
 # ============================================
 
 
-@app.get("/iot/sensors")
+@router.get("/iot/sensors")
 async def get_sensors():
     """Get all IoT sensors"""
     return {
@@ -812,7 +820,7 @@ async def get_sensors():
     }
 
 
-@app.post("/iot/ingest")
+@router.post("/iot/ingest")
 async def ingest_sensor_data(sensor_data: dict):
     """Ingest sensor data (for IoT devices)"""
     sensor_id = sensor_data.get("sensor_id")
@@ -830,7 +838,7 @@ async def ingest_sensor_data(sensor_data: dict):
 # ============================================
 
 
-@app.get("/analytics/kpis")
+@router.get("/analytics/kpis")
 async def get_kpis(current_user: dict = Depends(role_checker(["Manager", "Executive", "Admin"]))):
     """Get key performance indicators"""
     return {
@@ -844,7 +852,7 @@ async def get_kpis(current_user: dict = Depends(role_checker(["Manager", "Execut
     }
 
 
-@app.get("/analytics/demand-forecast")
+@router.get("/analytics/demand-forecast")
 async def get_demand_forecast():
     """Get AI-powered demand forecast"""
     return {
@@ -862,7 +870,7 @@ async def get_demand_forecast():
 # ============================================
 
 
-@app.get("/notifications")
+@router.get("/notifications")
 async def get_notifications(current_user: dict = Depends(get_current_user)):
     """Get user notifications"""
     return {
@@ -899,7 +907,7 @@ async def get_notifications(current_user: dict = Depends(get_current_user)):
 # ============================================
 
 
-@app.get("/rewards/balance")
+@router.get("/rewards/balance")
 async def get_reward_balance(current_user: dict = Depends(get_current_user)):
     """Get reward points balance"""
     return {
@@ -914,7 +922,7 @@ async def get_reward_balance(current_user: dict = Depends(get_current_user)):
     }
 
 
-@app.post("/rewards/redeem")
+@router.post("/rewards/redeem")
 async def redeem_points(
     redemption: dict,
     current_user: dict = Depends(get_current_user)
@@ -936,18 +944,12 @@ async def redeem_points(
     }
 
 # ============================================
-# MOUNT UNDER /api
+# REGISTER ROUTES UNDER /api
 # ============================================
 # The dashboard and Vercel's rewrite both call paths like /api/auth/login,
-# so the routes above (defined without the /api prefix) are mounted at
-# /api here. This works the same locally and on Vercel.
-_routes_app = app
-app = FastAPI(
-    title="THIWASCO SmartWater Platform",
-    description="Water Management Ecosystem for Thika, Kenya",
-    version="1.0.0",
-)
-app.mount("/api", _routes_app)
+# so the router (defined without the /api prefix) is included here with
+# that prefix. This works the same locally and on Vercel.
+app.include_router(router, prefix="/api")
 
 # ============================================
 # MAIN APPLICATION ENTRY POINT
@@ -959,7 +961,7 @@ if __name__ == "__main__":
     print("  Starting server...")
     print("=" * 60)
     print("\n📡 API Documentation: http://localhost:8000/docs")
-    print("🔍 Health Check: http://localhost:8000/health")
+    print("🔍 Health Check: http://localhost:8000/api/health")
     print("👤 Test User: john@example.com / password123")
     print("👨‍💼 Admin User: admin@thiwasco.co.ke / admin123")
     print("\n" + "=" * 60)
